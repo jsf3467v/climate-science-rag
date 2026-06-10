@@ -1,0 +1,2 @@
+index/bm25.joblib filter=lfs diff=lfs merge=lfs -text
+data/chunks_norm.jsonl filter=lfs diff=lfs merge=lfs -text

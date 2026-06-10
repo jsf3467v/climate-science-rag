@@ -1,0 +1,31 @@
+{
+  "n": 146,
+  "k": 10,
+  "model": "thenlper/gte-large",
+  "configs": {
+    "bm25": {
+      "recall_chunk": 0.3836,
+      "recall_paper": 0.6507,
+      "mrr_chunk": 0.2512,
+      "mrr_paper": 0.4774
+    },
+    "dense": {
+      "recall_chunk": 0.3973,
+      "recall_paper": 0.7466,
+      "mrr_chunk": 0.253,
+      "mrr_paper": 0.5381
+    },
+    "rerank": {
+      "recall_chunk": 0.5548,
+      "recall_paper": 0.8082,
+      "mrr_chunk": 0.4184,
+      "mrr_paper": 0.7201
+    },
+    "dense_rerank": {
+      "recall_chunk": 0.5205,
+      "recall_paper": 0.8356,
+      "mrr_chunk": 0.3961,
+      "mrr_paper": 0.7352
+    }
+  }
+}

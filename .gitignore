@@ -1,0 +1,29 @@
+# Working notes and history, never publish
+considerations
+*.rtf
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# On-disk model caches, replayed from the API, not artifacts
+*_cache.db
+embedder_cache/
+
+# Large ablation vectors, rebuild with dense_index.py
+*.faiss
+
+# Build intermediates, not needed to serve, rebuild locally
+data/candidates.jsonl
+data/enriched.jsonl
+data/chunks.jsonl
+data/chunks_clean.jsonl
+data/dropped.jsonl
+
+# Provenance manifests, skip to avoid path leaks
+data/manifest.json
+data/chunks_manifest.json
+
+# macOS and IDE cruft
+.DS_Store
+.idea/

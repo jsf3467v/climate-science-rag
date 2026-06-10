@@ -1,0 +1,19 @@
+{
+  "n": 146,
+  "k": 10,
+  "model": "thenlper/gte-large",
+  "configs": {
+    "bm25": {
+      "recall_chunk": 0.3836,
+      "recall_paper": 0.6507,
+      "mrr_chunk": 0.2512,
+      "mrr_paper": 0.4774
+    },
+    "embedder": {
+      "recall_chunk": 0.3973,
+      "recall_paper": 0.7466,
+      "mrr_chunk": 0.253,
+      "mrr_paper": 0.5381
+    }
+  }
+}

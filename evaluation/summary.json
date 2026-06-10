@@ -1,0 +1,30 @@
+{
+  "n": 146,
+  "k": 10,
+  "configs": {
+    "bm25": {
+      "recall_chunk": 0.3836,
+      "recall_paper": 0.6507,
+      "mrr_chunk": 0.2512,
+      "mrr_paper": 0.4774
+    },
+    "hyde": {
+      "recall_chunk": 0.3836,
+      "recall_paper": 0.6849,
+      "mrr_chunk": 0.2253,
+      "mrr_paper": 0.4477
+    },
+    "rerank": {
+      "recall_chunk": 0.5548,
+      "recall_paper": 0.8082,
+      "mrr_chunk": 0.4184,
+      "mrr_paper": 0.7201
+    },
+    "rerank_nohyde": {
+      "recall_chunk": 0.5274,
+      "recall_paper": 0.8219,
+      "mrr_chunk": 0.3956,
+      "mrr_paper": 0.7119
+    }
+  }
+}

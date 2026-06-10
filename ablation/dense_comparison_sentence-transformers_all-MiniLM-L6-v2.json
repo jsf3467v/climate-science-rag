@@ -1,0 +1,31 @@
+{
+  "n": 146,
+  "k": 10,
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "configs": {
+    "bm25": {
+      "recall_chunk": 0.3836,
+      "recall_paper": 0.6507,
+      "mrr_chunk": 0.2512,
+      "mrr_paper": 0.4774
+    },
+    "dense": {
+      "recall_chunk": 0.3356,
+      "recall_paper": 0.6644,
+      "mrr_chunk": 0.1835,
+      "mrr_paper": 0.4036
+    },
+    "rerank": {
+      "recall_chunk": 0.5548,
+      "recall_paper": 0.8082,
+      "mrr_chunk": 0.4184,
+      "mrr_paper": 0.7201
+    },
+    "dense_rerank": {
+      "recall_chunk": 0.4521,
+      "recall_paper": 0.7808,
+      "mrr_chunk": 0.3585,
+      "mrr_paper": 0.6826
+    }
+  }
+}

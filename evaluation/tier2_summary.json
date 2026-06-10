@@ -1,0 +1,19 @@
+{
+  "n": 146,
+  "judge": "claude-opus-4-6",
+  "metrics": {
+    "faithfulness": 0.9473,
+    "answer_relevance": 0.7773,
+    "context_precision": 0.608
+  },
+  "scored": {
+    "faithfulness": 146,
+    "answer_relevance": 143,
+    "context_precision": 143
+  },
+  "parse_failures": {
+    "faithfulness": 0,
+    "answer_relevance": 3,
+    "context_precision": 3
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-06-09T15:58:55.631577+00:00",
+  "config": {
+    "bm25_k1": 1.5,
+    "bm25_b": 0.75,
+    "chunks_path": "/Users/yomamma/Desktop/Portfolio/RAG-LLM/data/chunks_norm.jsonl"
+  },
+  "counts": {
+    "chunks": 118903
+  },
+  "artifacts": [
+    "bm25.joblib"
+  ]
+}

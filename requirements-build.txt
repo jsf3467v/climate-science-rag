@@ -1,0 +1,7 @@
+# Build-time dependencies only -- corpus selection and full-text/chunking.
+# Not installed on the Space; run these locally to produce the index and chunks,
+# then commit index/bm25.joblib and data/chunks_norm.jsonl for serving.
+datasets
+requests
+pymupdf
+pylatexenc

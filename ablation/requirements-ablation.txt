@@ -1,0 +1,10 @@
+# Ablation-only dependencies. NOT installed on the Space and NOT part of the build.
+# sentence-transformers is the one pretrained embedder, quarantined here so the
+# shipped system in src/ stays lexical; faiss-cpu is the vector index the dense
+# arm is searched with. Neither is served. Install alongside requirements.txt to
+# run the ablation scripts. embedder_ablation.py needs only sentence-transformers;
+# dense_index.py and dense_eval.py also need faiss-cpu. Pin both to your installed
+# versions once you have run them (pip show sentence-transformers faiss-cpu) if you
+# want the ablation reproducible too.
+sentence-transformers
+faiss-cpu
