@@ -1,3 +1,5 @@
+[![CI](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml)
+
 ---
 title: Climate arXiv RAG
 sdk: gradio
