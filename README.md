@@ -3,7 +3,7 @@
 ---
 title: Climate arXiv RAG
 sdk: gradio
-sdk_version: "5.9.1"
+sdk_version: "6.18.0"
 app_file: src/app.py
 pinned: false
 ---

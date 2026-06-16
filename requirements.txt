@@ -4,7 +4,7 @@
 # numbers no longer hold. Build-time tools (corpus/full-text fetch) are not
 # served and live in requirements-build.txt.
 anthropic==0.106.0
-gradio==5.9.1
+gradio==6.18.0
 numpy~=2.4
 scikit-learn==1.8.0
 rank_bm25==0.2.2
