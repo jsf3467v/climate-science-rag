@@ -1,11 +1,11 @@
-"""Answers synthesis for the climate-arXiv RAG project (src/).
+"""Answer synthesis for the climate arXiv RAG project (src/).
 
-Builds the retrieval pipeline by combining the HyDE-expanded query, BM25, and Claude rerank into a context set.
-It then prompts Claude to answer using only this context and to cite passage numbers. The answer is grounded through
-design. The prompt disallows outside knowledge and requests an explicit "not in the provided context" if the answer
-isn't found, ensuring Tier-2 faithfulness has a clear basis for scoring. Answers are stored on disk by query, context, and
-prompt. The process uses only the API as the model.
-
+Assembles the context set from the HyDE-expanded query, BM25, and the Claude
+reranker, then prompts Claude to answer from that context alone and to cite
+passage numbers. The answer is grounded by design, since the prompt forbids
+outside knowledge and asks for an explicit refusal when the context lacks the
+answer, which gives Tier 2 faithfulness a clear basis for scoring. Answers are
+cached on disk by query, context, and prompt. The only model used is the API.
 
     pip install anthropic rank_bm25 scikit-learn
     export ANTHROPIC_API_KEY=...
@@ -51,7 +51,7 @@ def claude_answer(query: str, chunks: list[dict], client: Anthropic, cfg: Config
 
 
 def cache_key(query: str, chunks: list[dict], cfg: Config) -> str:
-    # The key assumes temperature and max_tokens are fixed. Change either and clear synth_cache.db first, or stale answers are served.
+    # Temperature and max_tokens are part of the key, so changing either invalidates the cache on its own.
     ids = ",".join(c["chunk_id"] for c in chunks)
     payload = f"{cfg.model}|{cfg.temperature}|{cfg.max_tokens}|{cfg.snippet_chars}|{SYSTEM}|{query}|{ids}"
     return hashlib.sha1(payload.encode()).hexdigest()

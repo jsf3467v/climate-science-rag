@@ -1,12 +1,13 @@
 """HyDE query expansion for the climate-arXiv RAG project (src/).
 
-Bridges the vocabulary gap between a paraphrased question and the corpus. Claude creates a concise,
-plausible climate-science passage that could answer the query. Retrieval then uses this passage—by default,
-with the original query added at the beginning instead than just the question itself. It matches domain-specific
-terms and synonyms within the passage, rather than relying solely on the question's exact wording, addressing
-issues like low-overlap questions identified in diagnostics. Passages are cached on disk by query and prompt,
-enabling recovery during repeated or interrupted runs, and prompt edits clear the cache effectively. The entire
-process uses only the API; no local models are involved.
+This process bridges the vocabulary gap between a paraphrased question and the corpus. Claude generates a brief,
+plausible climate-science passage that can answer the query. Retrieval then uses this passage, typically with the
+original query prepended instead of just the question. It searches for domain-specific
+terms and synonyms within the passage, rather than relying solely on the question's exact wording.
+This helps address issues such as low-overlap questions identified in diagnostics. Passages are then cached on disk by query
+and prompt, allowing recovery during repeated or interrupted runs. The prompt edits effectively clear the cache. The entire
+process operates only via the API, with no local models involved.
+
 
 
     pip install anthropic
@@ -45,7 +46,7 @@ def claude_passage(query: str, client: Anthropic, cfg: Config) -> str:
 
 
 def cache_key(query: str, cfg: Config) -> str:
-    # The key assumes temperature and max_tokens are fixed. Change either and clear hyde_cache.db first, or stale passages are served.
+    # Temperature and max_tokens are part of the key, so changing either invalidates the cache on its own.
     payload = f"{cfg.model}|{cfg.temperature}|{cfg.max_tokens}|{cfg.max_words}|{SYSTEM}|{query}"
     return hashlib.sha1(payload.encode()).hexdigest()
 

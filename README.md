@@ -1,5 +1,3 @@
-[![CI](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml)
-
 ---
 title: Climate arXiv RAG
 sdk: gradio
@@ -7,6 +5,8 @@ sdk_version: "6.18.0"
 app_file: src/app.py
 pinned: false
 ---
+
+[![CI](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml)
 
 # Climate Science arXiv RAG
 
@@ -70,7 +70,7 @@ model calls, is cached or checkpointed, so a stop and rerun resumes instead of r
    faithfulness, answer relevance, and context precision. The reranked path that deploys
    is the exact path the eval scores.
 
-## Dependancies
+## Dependencies
 
 * **Python**, CPU only. No GPU anywhere in the served stack.
 
@@ -140,7 +140,7 @@ paper recall by thirteen points, from 0.685 to 0.815. It performs slightly negat
 questions, where the expansion only adds plausible competitors to an already well-matched
 query. The overall neutrality is the average of this specific gain and the small loss. 
 Thus, HyDE proves effective precisely in the failure mode it was designed for, and it remains valuable. 
-Routing HyDE based on estimated query overlap—applying it only to low-overlap queries—is a logical refinement.
+Routing HyDE by estimated query overlap, so it applies only to low-overlap queries, is a logical refinement.
 
 
 ### Dense retrieval ablation, the cost of the constraint
@@ -149,7 +149,7 @@ An ablation evaluates the cost of the lexical-only constraint during retrieval. 
 sentence transformer is indexed in FAISS and scored against BM25 using the same questions, source chunks, 
 and recall and MRR metrics, allowing for direct comparison of rows. The
 embedder exists solely within the ablation (`ablation/`) and is not part of the deployed system. 
-Two models represent two honest scenarios: a small, general model with a short context window and a more 
+Two models represent two honest scenarios, a small, general model with a short context window and a more 
 powerful model that processes the full chunk.
 
 
@@ -163,7 +163,7 @@ The small model does not outperform BM25, missing three out of four metrics. How
 as the model is more general rather than scientific, and its 256-token window truncates a 250-word chunk, 
 meaning it processes less text than BM25. The more advanced model, which reads the entire chunk, outperforms BM25 
 at the paper level, increasing recall from 0.651 to 0.747 and MRR from 0.477 to 0.538, while tying at the chunk level. 
-The main advantage is topical relevance: a dense embedder is better at identifying the correct paper, and for exact 
+The main advantage is topical relevance. A dense embedder is better at identifying the correct paper, and for exact 
 passage matching based on lexical terms, it is already competitive. Therefore, at the initial retrieval stage, this 
 constraint reduces paper recall by about ten points compared to a strong embedder.
 
@@ -223,66 +223,61 @@ paper.
 
 ## Reproducibility
 
-Reproducibility is outlined in three explicit tiers, as the deterministic core of
-a RAG pipeline is reproducible, unlike a model. Clarifying which tier is
-claimed is more important than asserting the highest one.
+Reproducibility is stated in three plain tiers, because the deterministic core of
+a RAG pipeline is reproducible while a model is not. Saying which tier a result
+claims matters more than claiming the highest one.
 
+* **Bitwise**. The deterministic core produces identical bytes from a fixed
+corpus and configuration. This covers chunking, cleaning, normalization, BM25
+indexing, lexical retrieval, and the judge-free Tier 1 scoring. It is verified by
+rebuilding the index and obtaining the same BM25 retrieval results to the digit.
 
-* **Bitwise**. Identical bytes are produced at every stage. The deterministic core—comprising 
-chunking, cleaning, normalization, BM25 indexing, lexical retrieval, and the judge-free Tier 1 
-scoring—is reproducible in a bitwise manner from a fixed corpus and configuration. This is 
-verified by rebuilding the index and obtaining the exact same BM25 retrieval results. The 
-model-dependent parts—such as HyDE, reranking, synthesis, and the Tier 2 judge—are only 
-bitwise reproducible when using on-disk caches that store every model response, keyed by model, 
-prompt, and inputs. The cache acts as a frozen snapshot. Using it ensures that reruns replay identically, 
-making the question set and cached outputs equivalent to committed inputs rather than newly generated outputs.
+* **Statistical**. A rerun of the model layer lands within a small noise band
+rather than on the same bytes, because the API is not deterministic at
+temperature 0 and models can change or be retired. Rerunning shifted the
+model-dependent numbers by 0.01 to 0.05 while the deterministic BM25 rows stayed
+identical.
 
+* **Provenance**. The model layer is reproducible as provenance rather than
+bitwise. The committed result files, results.jsonl and summary.json for Tier 1
+and the two Tier 2 files, are the record of what the committed prompts and
+configuration produced. This is the honest standard for anything that depends on
+an LLM, since pretending the model is deterministic would not hold.
 
-* **Statistical**. A rerun falls within the expected noise range. This is a less reliable fallback for 
-the model layer when caches are missing, as the API is not bitwise deterministic even at temperature 0, 
-and models may change or be retired. Clearing the cache and rerunning shifted the model-dependent numbers 
-by 0.01 to 0.05, staying within the stated interval, while the deterministic BM25 rows remained identical.
-
-
-* **Provenance**. The specific conditions that led to a result are recorded and verifiable, even if a deprecated 
-model prevents re-computation. For anything reliant on LLMs, this represents the realistic gold standard, and it's 
-more honest than pretending the model is deterministic.
-
-
-This project aims for bitwise reproducibility of the deterministic basis and uses
-provenance and cache backed replay for model dependent results. The only component not yet
-meeting this standard is corpus construction, which reads a live snapshot and live
-citations with a date based cutoff (see the limitation below). Fixing the snapshot
-revision, freezing the citation enrichment, and setting the cutoff date would bring it to
-bitwise reproducibility.
+This project claims bitwise reproducibility for the deterministic core and
+provenance for the model layer, with the committed result files as the record.
+The one component below this bar is corpus construction, which reads a live
+snapshot and live citations with a date-based cutoff (see the limitation below).
+Pinning the snapshot revision, freezing the citation enrichment, and setting the
+cutoff date would bring it to bitwise reproducibility.
 
 ## Limitations and future work
 
-* **Synthetic, Single Model Family Evaluation:** The current evaluation questions are generated by `claude-sonnet-4-6`, which also performs HyDE, reranking, and synthesis. The Tier 2 judge uses a different model (`claude-opus-4-6`), and the overlap between questions and source chunks is measured so that the keyword edge passed to BM25 is transparent rather than hidden. However, since the benchmark is synthetic and partly authored by the system's own model family, it has certain validity limitations. Human-curated questions would improve the evaluation's robustness significantly.
+* **Synthetic, Single Model Family Evaluation.** The current evaluation questions are generated by `claude-sonnet-4-6`, which also performs HyDE, reranking, and synthesis. The Tier 2 judge uses a different model (`claude-opus-4-6`), and the overlap between questions and source chunks is measured so that the keyword edge passed to BM25 is transparent rather than hidden. However, since the benchmark is synthetic and partly authored by the system's own model family, it has certain validity limitations. Human-curated questions would improve the evaluation's robustness significantly.
 
 
-* **Faithfulness Measures Groundedness, Not Truth:** The 0.947 faithfulness score indicates the proportion of answer claims supported by retrieved passages, rather than verifying their scientific correctness. No domain expert validation was performed, so a confidently cited but incorrect passage could still be scored as faithful. This score reflects hallucination resistance, not factual accuracy.
+* **Faithfulness Measures Groundedness, Not Truth.** The 0.947 faithfulness score indicates the proportion of answer claims supported by retrieved passages, rather than verifying their scientific correctness. No domain expert validation was performed, so a confidently cited but incorrect passage could still be scored as faithful. This score reflects hallucination resistance, not factual accuracy.
 
 
-* **No Dense Retrieval, by Design:** A strong embedder outperforms BM25 by about ten points in paper recall at the single retrieval stage. When pools are reranked, this gap narrows to around three points and is within the noise range. The lexical pipeline performs better at the chunk level, so implementing a dense first-stage reranking would give marginal gains at the paper level and is a viable extension.
+* **No Dense Retrieval, by Design.** A strong embedder outperforms BM25 by about ten points in paper recall at the single retrieval stage. When pools are reranked, this gap narrows to around three points and is within the noise range. The lexical pipeline performs better at the chunk level, so implementing a dense first-stage reranking would give marginal gains at the paper level and is a viable extension.
 
 
 * **HyDE is a targeted lever applied unconditionally.** HyDE significantly improves reranked chunk recall on roughly one third of questions, almost doubling it, but has a mild negative effect on high overlap questions. Applying HyDE conditionally based on estimated query overlap could preserve the benefits while reducing unnecessary costs.
 
 
-* **Evaluation Set:** Consisting of 146 questions with intervals of roughly 0.08, both tiers now cover the entire set. A larger dataset would improve stratification, especially since the high-overlap band contains only 14 questions.
+* **Evaluation Set.** Consisting of 146 questions with intervals of roughly 0.08, both tiers now cover the entire set. A larger dataset would improve stratification, especially since the high-overlap band contains only 14 questions.
 
 
-* **Single-Shot, Not Agentic:** The system retrieves and answers in one go, without decomposing multi-step questions, using tools, or self-critique. These are potential enhancements for future development.
+* **Single-Shot, Not Agentic.** The system retrieves and answers in one go, without decomposing multi-step questions, using tools, or self-critique. These are potential enhancements for future development.
 
 
-* **Presentation vs. Measurement:** The current display does not reflect per-paper diversity, so the same paper might appear multiple times. Simple deduplication would improve presentation without affecting scoring.
+* **Presentation vs. Measurement.** The current display does not reflect per-paper diversity, so the same paper might appear multiple times. Simple deduplication would improve presentation without affecting scoring.
 
 
-* **Corpus is a Point-in-Time Snapshot:** The corpus captures a live snapshot with a recency cutoff based on date, making reruns non-reproducible. Using a versioned corpus would lock the snapshot and cutoff for consistency.
+* **Corpus is a Point-in-Time Snapshot.** The corpus captures a live snapshot with a recency cutoff based on date, making reruns non-reproducible. Using a versioned corpus would lock the snapshot and cutoff for consistency.
 
 
-* **Residual Data Noise:** Some acknowledgment texts under malformed sections may persist after cleaning, and about 1% of chunks are short fragments. Implementing a body-level acknowledgment filter and more restrictive chunking would address these issues.
+* **Residual Data Noise.** Some acknowledgment texts under malformed sections may persist after cleaning, and about 1% of chunks are short fragments. Implementing a body-level acknowledgment filter and more restrictive chunking would address these issues.
 
 
 

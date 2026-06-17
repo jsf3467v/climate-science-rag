@@ -1,11 +1,12 @@
 """LLM reranker for the climate-arXiv RAG project (src/).
 
-The first point the language model enters this stage. Retrieval (BM25) returns a
-candidate pool; this pass asks Claude to reorder it by relevance to the query,
-listwise, in one call, and keeps the top results. Orderings are cached on disk
-by query, candidate set, prompt, and snippet length, so a crashed or repeated
-eval run never pays for the same call twice and a prompt edit invalidates
-cleanly. No local model runs here; the only model is the API.
+This is the initial stage where the language model begins. Retrieval (BM25)
+provides a pool of candidates; this step prompts Claude to reorder them by
+relevance to the query, using a listwise approach in a single call, retaining
+only the top results. These orderings are stored on disk based on query, candidate set,
+prompt, and snippet length, ensuring that a crashed or repeated evaluation run does not
+incur duplicate costs and that prompt edits invalidate the cache properly. No local
+models are used here; only the API model is involved.
 
     pip install anthropic
     export ANTHROPIC_API_KEY=...
@@ -60,7 +61,7 @@ def claude_ranking(query: str, candidates: list[dict], client: Anthropic, cfg: C
 
 
 def cache_key(query: str, candidates: list[dict], cfg: Config) -> str:
-    # The key assumes temperature and max_tokens are fixed. Change either and clear rerank_cache.db first, or stale rankings are served.
+    # Temperature and max_tokens are not in this key, so clear rerank_cache.db if you change either.
     ids = ",".join(c["chunk_id"] for c in candidates)
     payload = f"{cfg.model}|{cfg.snippet_chars}|{SYSTEM}|{query}|{ids}"
     return hashlib.sha1(payload.encode()).hexdigest()
