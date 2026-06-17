@@ -1,0 +1,5 @@
+# Test only dependencies. Not installed on the Space and not part of the build.
+# Used by .github/workflows/ci.yml and for running pytest locally. The runtime
+# imports the tests need (anthropic, numpy, scikit-learn, joblib) come from
+# requirements.txt, so install both together.
+pytest>=8,<10
