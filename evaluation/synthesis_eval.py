@@ -1,4 +1,4 @@
-"""Tier-2 judged evaluation for the climate-arXiv RAG project (evaluation/).
+"""Tier 2 judged evaluation for the climate arXiv RAG project (evaluation/).
 
 The system generates an answer for each question using the winning retrieval pipeline's
 context and then evaluates it with an independent judge model based on three RAGAS-style
@@ -6,8 +6,8 @@ metrics. These metrics include faithfulness (measuring the proportion of the ans
 claims supported by the context), answer relevance (assessing how well the answer addresses the question), and
 context precision (determining the proportion of retrieved passages that are relevant). The
 judge must be different from the generation model, which is enforced below, to prevent it
-from grading its own work. Purposeful avoidance of embedding-based RAGAS is implemented because it
-requires a pretrained embedder; since everything except the LLM is built from scratch, each metric is
+from grading its own work. Embedding-based RAGAS is avoided because it
+requires a pretrained embedder. Since everything except the LLM is built from scratch, each metric is
 scored by an LLM. Judge calls are cached to allow resumption after crashes. It operates outside src/, so src/ is added to the path.
 
 
