@@ -63,3 +63,27 @@ jobs:
           echo "::group::Format check (advisory)"
           ruff format --check . || true
           echo "::endgroup::"
+
+  # Exercises the deterministic, offline core only. The model stages (HyDE,
+  # rerank, synthesis, judge) need the Anthropic API and the corpus build needs
+  # arXiv, so neither runs here. The suite covers the pure logic those stages
+  # rely on: JSON parsing, tokenization, cleaning, ranking, and the scorers.
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        # Installing the serving requirements also confirms the Space pins resolve.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest -q
