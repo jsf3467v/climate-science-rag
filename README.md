@@ -1,120 +1,156 @@
 ---
 title: Climate arXiv RAG
 sdk: gradio
-sdk_version: "6.18.0"
+sdk_version: 5.9.1
 app_file: src/app.py
 pinned: false
 ---
 
-[![CI](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml)
-
 # Climate Science arXiv RAG
 
-This project answers climate science questions over a corpus of roughly 3,000 arXiv papers and grounds every answer in the passages it retrieves. A question is initially expanded into a hypothetical answer, which is then matched against a lexical index. It is reranked using a language model and answered solely based on the retrieved text, including inline citations and an explicit refusal if the corpus lacks the requested information.
+The system answers climate science questions using only evidence it retrieves from a corpus of approximately 3,000 arXiv papers, never from the language model's own training. Each claim in an answer comes from a specific retrieved passage and is cited to it, so a reader can trace every statement back to its source paper. When the corpus holds no passage that addresses a question, the system declines rather than fills the gap from memory. Restricting every answer to cited source evidence in this way is what grounded means here, and the retrieval and reranking stages described below exist to place the most relevant passages in front of the model before it writes.
 
-The entire process is accessible through an interactive Gradio chat, allowing users to ask questions and receive either a cited response or a refusal.
+The system runs as an interactive chat interface built with Gradio, where a user asks a climate science question in plain language, and the interface drives the full pipeline described below.
 
-The main constraint is that only the language model is pretrained, resulting in a system without dense embedders or cross-encoders. The retrieval relies solely on lexical methods such as BM25, while the language model handles query expansion, reranking, synthesis, and evaluation. An ablation study shown below compares this setup to a strong pretrained embedder and demonstrates that the reranker nearly recovers the embedder's advantages. As a result, the lexical-only approach provides a lightweight, CPU-only, inspectable system with minimal additional cost.
+The primary limitation is that only the language model is pretrained; the system does not include dense embedders or cross encoders. Retrieval depends solely on lexical methods like BM25, while the language model manages query expansion, reranking, synthesis, and evaluation. An ablation study below compares this approach to a robust pretrained embedder, showing that the reranker nearly recovers the embedder's advantage. Consequently, this constraint results in a lightweight, CPU-only, and easily inspectable retrieval system with minimal measured cost.
 
-Build, deploy, and local run instructions, including how to launch the chat, are in `DEPLOYME.md`.
+See `DEPLOYME.md` for build, deploy, and local run instructions, including how to launch the chat interface.
 
 ## Architecture
 
-The pipeline runs as a sequence of single-purpose stages, with the more expensive downloads and model calls cached or checkpointed so that, in case of an interruption, the model resumes rather than restarts.
+The pipeline consists of a series of single-purpose stages. The costly tasks, such as downloads and model calls, are cached or checkpointed, allowing a stop and rerun to resume from where it left off instead of repeating a run.
 
-The `corpus.py` script builds a collection of climate papers from a static snapshot of arXiv metadata, avoiding live API rate limits and ensuring clear licensing. It enriches each paper with Semantic Scholar citations and fields, then filters down to approximately 3,000 papers using keywords, citation metrics, and recency criteria. The `fulltext.py` script retrieves the LaTeX source for these papers and reconstructs their section structure, resorting to PDFs when source files are unavailable. It then divides each section into 250-word segments with a 40-word overlap, preserving provenance for each chunk. After cleaning, around 119,000 chunks remain.
+1. **Corpus** (`corpus.py`). Enumerates climate papers from a static arXiv metadata snapshot, which avoids live API rate limits and carries a clear license. It enriches them with Semantic Scholar citations and fields, then filters by keyword and by a citation and recency gate down to 3,000 papers.
 
-Cleaning and normalization (`clean.py`, `normalize.py`) remove reference lists and data-table chunks, applying a prose-density gate first so that genuine prose is kept whatever its citation count, then filtering on citation structure such as DOIs, `et al`, and parenthetical years together with a numeric-ratio test on what remains. Normalization scrubs the LaTeX-to-text placeholder artifacts while leaving real content untouched.
+2. **Full text and chunking** (`fulltext.py`). Fetches LaTeX source and recovers section structure, falling back to the PDF when source is missing. Sections are split into 250-word windows with 40-word overlap, and each chunk carries provenance. Approximately 119k chunks survive cleaning.
 
-The retrieval core (`indexer.py`, `retrieve.py`) is a single BM25 index over a shared tokenizer, with no embeddings anywhere. Query expansion (`hyde.py`) uses HyDE, where the model writes a short, plausible answer passage and retrieval runs on that passage prepended to the query, so lexical matching can reach domain terms a paraphrased question never names. Reranking (`rerank.py`) then has the model reorder the BM25-over-HyDE candidate pool listwise in a single call, and synthesis (`synthesize.py`) answers from those reranked passages alone, cites them by number, and declines when the answer is not present.
+3. **Cleaning and normalization** (`clean.py`, `normalize.py`). A prose density gate drops reference lists and data table chunks first, while keeping genuine prose regardless of how many citations it contains. The remainder is filtered by citation structure, such as DOIs, et al., and parenthetical years, and by a numeric ratio test. Normalization then scrubs LaTeX-to-text placeholder artifacts and leaves real content untouched.
 
-The evaluation lives in evaluation/ and separates the quality of what is retrieved from the quality of what is written. A deterministic, judge-free process manages retrieval by measuring recall@k and MRR based on the original source chunk for each question. Separately, an independent judge model assesses the synthesis by scoring faithfulness, relevance of the answer, and context accuracy. Since the path being scored is the same path that deploys, the numbers describe the served system rather than serving as a stand-in for it.
+4. **Index and retrieval** (`indexer.py`, `retrieve.py`). A single BM25 index over a shared tokenizer, with no embeddings.
+
+5. **Query expansion** (`hyde.py`). HyDE has the model write a short, plausible answer passage. Retrieval runs on that passage, prepended with the query, so lexical matching reaches domain terms that a paraphrased question never names.
+
+6. **Reranking** (`rerank.py`). The model reorders the BM25-over-HyDE candidate pool listwise in a single call.
+
+7. **Synthesis** (`synthesize.py`). The model answers from the reranked passages only, cites them by number, and declines when the answer is absent.
+
+8. **Evaluation** (`evaluation/`). Tier 1 is judge-free and deterministic, computing recall and MRR at cutoff $k$ against each question's source chunk. Tier 2 uses an independent judge model that scores faithfulness, answer relevance, and context precision. The reranked path that deploys is the exact path the evaluation scores.
 
 ## Dependencies
 
-The served stack includes only Python and CPU, with no GPU used at any stage. Lexical retrieval is performed with `rank_bm25`, while `scikit-learn` provides the stopword tokenizer set. The index is saved using `joblib`. Full-text extraction uses `pylatexenc` and `PyMuPDF`. The arXiv metadata snapshot is fetched via Hugging Face `datasets`, and citation data is obtained through the Semantic Scholar API. The language model is Anthropic Claude: `claude-sonnet-4-6` handles HyDE, reranking, synthesis, and writing evaluation questions, while `claude-opus-4-6` acts as the independent Tier 2 judge, which must differ from the generation model to avoid grading its own work. Gradio offers the chat interface. The only embedding dependencies, `sentence-transformers` and FAISS, are used only in the ablation and are not part of the served system.
+- **Python**, CPU-only. No GPU anywhere in the served stack.
+
+- **rank_bm25** for lexical retrieval, **scikit-learn** for the shared tokenizer stopword set, and **joblib** to persist the index.
+
+- **pylatexenc** and **PyMuPDF** for LaTeX and PDF full-text extraction.
+
+- **Hugging Face `datasets`** for the arXiv metadata snapshot and the **Semantic Scholar** API for citation metadata.
+
+- **Anthropic Claude**. `claude-sonnet-4-6` for HyDE, reranking, synthesis, and writing the eval questions, and `claude-opus-4-6` as the independent Tier 2 judge, enforced to differ from the generation model so it never grades its own work.
+
+- **Gradio** for the interactive chat app.
+
+- **sentence-transformers** and **FAISS** appear only in the ablation (`ablation/`) to measure the cost of the lexical-only constraint, and neither enters the served system.
 
 ## Results
 
-The first table reports Tier 1 retrieval over $n = 146$ questions at a cutoff of $k = 10$.
+Tier 1 retrieval, $n=146$ questions, cutoff $k=10$.
 
-| Configuration | recall@10 (chunk) | recall@10 (paper) | MRR@10 (chunk) | MRR@10 (paper) |
-| --- | --- | --- | --- | --- |
-| BM25 | 0.384 | 0.651 | 0.251 | 0.477 |
-| with HyDE | 0.384 | 0.685 | 0.225 | 0.448 |
-| with HyDE and rerank | 0.555 | 0.808 | 0.418 | 0.720 |
-| rerank, no HyDE | 0.527 | 0.822 | 0.396 | 0.712 |
+| Configuration        | recall@10 (chunk) | recall@10 (paper) | MRR@10 (chunk) | MRR@10 (paper) |
+| -------------------- | ----------------- | ----------------- | -------------- | -------------- |
+| BM25                 | 0.384             | 0.651             | 0.251          | 0.477          |
+| with HyDE            | 0.384             | 0.685             | 0.225          | 0.448          |
+| with HyDE and rerank | 0.555             | 0.808             | 0.418          | 0.720          |
+| rerank, no HyDE      | 0.527             | 0.822             | 0.396          | 0.712          |
 
-The served path uses BM25 over HyDE, followed by a listwise reranker. It includes the row marked with HyDE and rerank, which corresponds exactly to the evaluation scores. The last row reranks a plain BM25 pool without HyDE, testing if query expansion provides a real benefit.
+The served path is BM25 over HyDE followed by the listwise reranker, shown in the row marked with HyDE and rerank, and it is the exact path the evaluation scores. The final row reranks a plain BM25 pool with HyDE removed, included to test whether query expansion contributes.
 
-Chunk-level recall is a strict single-reference metric, as each question is scored against the one chunk it originated from out of about 119,000. Even a near-perfect neighbor is considered a miss. The paper-level metrics, which count any chunk from the correct paper, give a fairer assessment of retrieval quality. The paper-level MRR indicates that once the correct paper is retrieved, it is usually ranked first or second.
+Chunk-level recall is a strict single-reference metric. Each question is scored against the one chunk it was written from, out of roughly 119k, so retrieving an equally good neighbor still counts as a miss. The paper-level numbers credit any chunk from the correct paper and give a fairer read of retrieval quality. The paper-level MRR shows that when the right paper is found, it usually sits at rank one or two.
 
-The main improvements come from the reranker. Switching from BM25 to the reranked path raises chunk recall from 0.384 to 0.555 and paper MRR from 0.477 to 0.720. These improvements are significantly above the approximate 0.08 confidence interval at this sample size, indicating that the reranker is the key component driving the results.
+The gain is concentrated in the reranker. Moving from BM25 to the reranked path raises chunk recall from 0.384 to 0.555 and paper MRR from 0.477 to 0.720, a step well beyond the roughly 0.08 confidence interval at this sample size. The reranker is the component that produces the result.
 
-### Does HyDE earn its keep
+### Does HyDE contribute
 
-Overall, HyDE and the no-HyDE rerank path are comparable, with $0.555$ versus $0.527$ in chunk recall and $0.808$ versus $0.822$ in paper recall, both within the margin of error. An earlier interpretation of these aggregate figures suggested that HyDE could be eliminated, but dividing the questions based on the lexical overlap between a question and its source chunk reveals this is incorrect. The average tie in the aggregate results masks two opposing effects. The questions with low overlap—those below $0.30$, accounting for about a third of the set with 54 of 146 questions—are the primary challenge HyDE was designed to address. In contrast, the 14 questions with high overlap already share vocabulary with the corpus and do not require additional help.
+Overall, HyDE and the no-HyDE rerank path are tied, with scores of 0.555 versus 0.527 for chunk recall and 0.808 versus 0.822 for paper recall, both within noise levels. An initial review of these combined figures suggested that HyDE could be eliminated. However, analyzing questions based on the lexical overlap between the question and its source chunk reveals that this conclusion is incorrect, as the overall similarity masks two opposing effects. Low-overlap questions, with less than 0.30 overlap and constituting a third of the set at 54 out of 146, represent the failure mode HyDE was designed to address. Conversely, high-overlap questions, totaling 14 out of 146, already share vocabulary with the corpus and do not require additional help.
 
-The next table reports recall by overlap band for the reranked paths, written as chunk recall then paper recall.
+Recall by overlap band follows for the reranked paths, given as chunk recall then paper recall.
 
-| Configuration | low overlap (n=54) | mid overlap (n=78) | high overlap (n=14) |
-| --- | --- | --- | --- |
-| BM25 | 0.093 / 0.500 | 0.487 / 0.705 | 0.929 / 0.929 |
-| with HyDE and rerank | 0.352 / 0.815 | 0.654 / 0.795 | 0.786 / 0.857 |
-| rerank, no HyDE | 0.185 / 0.685 | 0.692 / 0.885 | 0.929 / 1.000 |
+| Configuration        | low overlap (n=54) | mid overlap (n=78) | high overlap (n=14) |
+| -------------------- | ------------------ | ------------------ | ------------------- |
+| BM25                 | 0.093 / 0.500      | 0.487 / 0.705      | 0.929 / 0.929       |
+| with HyDE and rerank | 0.352 / 0.815      | 0.654 / 0.795      | 0.786 / 0.857       |
+| rerank, no HyDE      | 0.185 / 0.685      | 0.692 / 0.885      | 0.929 / 1.000       |
 
-On the paraphrased band, HyDE nearly doubles reranked chunk recall, from $0.185$ to $0.352$, and improves paper recall by thirteen points, from $0.685$ to $0.815$. It becomes slightly negative on high-overlap questions, where expansion only adds plausible competitors to an already well-matched query. The overall neutrality reflects the average of this targeted gain and a small loss. HyDE performs as intended in its failure mode and remains valuable, with the potential refinement of routing it by estimated query overlap to activate only on low-overlap queries.
+On the paraphrased band, HyDE nearly doubles reranked chunk recall, from 0.185 to 0.352, and raises paper recall by thirteen points, from 0.685 to 0.815. It performs slightly worse on high-overlap questions, where the expansion only adds plausible competitors to an already well-matched query. The overall neutrality is the average of this targeted gain and the small loss. HyDE therefore proves effective in the exact failure mode it was designed for and remains valuable. Routing HyDE by estimated query overlap, so that it applies only to low-overlap queries, is a logical refinement.
 
 ### Dense retrieval ablation, the cost of the constraint
 
-This ablation assesses the retrieval cost of using only lexical constraints. It uses a pretrained sentence transformer indexed in FAISS, scored against BM25 on identical questions, source chunks, and metrics, allowing for direct comparison of rows. The embedder resides solely within the ablation (`ablation/`) and not in the deployed system. Two models represent two realistic scenarios: a small, general model with a short context window and a more capable model that processes the entire chunk.
+An ablation evaluates the cost of the lexical-only constraint during retrieval. A pretrained sentence transformer is indexed in FAISS and scored against BM25 with the same questions, source chunks, and recall and MRR metrics, which allows a direct comparison of rows. The embedder exists only within the ablation (`ablation/`) and is not part of the deployed system. Two models represent two honest scenarios. The first is a small, general model with a short context window, and the second is a more powerful model that processes the full chunk.
 
-| Configuration | recall@10 (chunk) | recall@10 (paper) | MRR@10 (chunk) | MRR@10 (paper) |
-| --- | --- | --- | --- | --- |
-| BM25 | 0.384 | 0.651 | 0.251 | 0.477 |
-| `all-MiniLM-L6-v2` | 0.336 | 0.664 | 0.183 | 0.404 |
-| `thenlper/gte-large` | 0.397 | 0.747 | 0.253 | 0.538 |
+| Configuration        | recall@10 (chunk) | recall@10 (paper) | MRR@10 (chunk) | MRR@10 (paper) |
+| -------------------- | ----------------- | ----------------- | -------------- | -------------- |
+| BM25                 | 0.384             | 0.651             | 0.251          | 0.477          |
+| `all-MiniLM-L6-v2`   | 0.336             | 0.664             | 0.183          | 0.404          |
+| `thenlper/gte-large` | 0.397             | 0.747             | 0.253          | 0.538          |
 
-The small model fails to outperform BM25 in three out of four metrics, although the difference is minor. This is partly because the model is general instead of scientific, and its 256-token window truncates a 250-word chunk, meaning it actually processes less text than BM25. The more capable model, which reads the entire chunk, outperforms BM25 at the paper level, increasing recall from $0.651$ to $0.747$ and MRR from $0.477$ to $0.538$, while remaining tied at the chunk level. Its advantage is topical, as a dense embedder more accurately identifies the correct paper and is already effective at matching specific lexical passages, which leads to roughly ten points lower recall in paper retrieval at this initial stage.
+The small model does not outperform BM25 and falls short on three of the four metrics. This is a close miss because the model is general rather than scientific, and its 256-token window truncates a 250-word segment, resulting in less processed text than BM25. The more advanced model reads the entire chunk and surpasses BM25 at the paper level, increasing recall from 0.651 to 0.747 and MRR from 0.477 to 0.538, while remaining tied at the chunk level. Its primary strength is topical relevance, as a dense embedder more effectively identifies the correct paper, and it is already competitive for exact passage matching on lexical terms. Therefore, at the initial retrieval stage, this constraint lowers paper recall by about ten points compared to a strong embedder.
 
-| Configuration | recall@10 (chunk) | recall@10 (paper) | MRR@10 (chunk) | MRR@10 (paper) |
-| --- | --- | --- | --- | --- |
-| lexical and rerank (served) | 0.555 | 0.808 | 0.418 | 0.720 |
-| `gte-large` and rerank | 0.520 | 0.836 | 0.396 | 0.735 |
+The single-stage gap explains the whole story, as the served pipeline also performs reranking. By fixing the reranker and changing only the first stage, it is evident that the embedder is added once reranking is included.
 
-The results are split, with all gaps within the $0.08$ range, making the two pools effectively comparable. The reranked dense pool outperforms at the paper level, scoring $0.836$ compared to $0.808$, while at the chunk level, the reranked lexical pool leads with $0.555$ versus $0.520$. This reflects the previous topical-versus-exact distinction, now after reranking. The ten-point advantage of the embedder over raw BM25 in paper recall diminishes to about three points after reranking both pools, which is within the margin of error. Therefore, the reranker applied to a lexical pool nearly matches the embedder's performance, keeping the system lexical with minimal additional cost. Using a reranked dense first stage offers marginal improvement for paper retrieval and is a reasonable option if the constraints are relaxed; however, it is not a definitive improvement.
+| Configuration               | recall@10 (chunk) | recall@10 (paper) | MRR@10 (chunk) | MRR@10 (paper) |
+| --------------------------- | ----------------- | ----------------- | -------------- | -------------- |
+| lexical and rerank (served) | 0.555             | 0.808             | 0.418          | 0.720          |
+| `gte-large` and rerank      | 0.520             | 0.836             | 0.396          | 0.735          |
 
-A weak embedder cannot be significantly improved by reranking alone. Reranking the MiniLM pool attains only $0.452$ chunk recall and $0.781$ paper recall, both lower than the lexical pipeline. This is because the reranker can only reorder the pool it receives and cannot identify correct results the first stage failed to produce. While it can refine a good candidate set, it cannot generate recall from a poor one.
+The results indicate that all differences are within the 0.08 confidence interval, showing the two methods are statistically similar. The reranked dense pool slightly surpasses at the paper level with scores of 0.836 compared to 0.808, whereas the reranked lexical pool has a small edge at the chunk level with 0.555 versus 0.520. This echoes the earlier topically versus exact-match distinction seen in single-stage results, now after reranking. The ten-point recall lead of the embedder over BM25 at the paper level narrows to about three points once reranking is applied to both pools, and this difference is within noise levels. The reranker, which operates on a lexical pool, nearly restores the embedder’s advantage, explaining why the system remains lexical with minimal extra cost. Using a reranked dense first stage provides a slight gain in paper retrieval and is a reasonable choice if constraints are loosened, though it doesn't represent a significant victory.
+
+A weak embedder cannot be improved solely through reranking. Re-ranking the MiniLM pool achieves only a 0.452 chunk recall and a 0.781 paper recall, both lower than the lexical pipeline's performance. Since the reranker can only reorder the pool it receives, it cannot retrieve correct results that were never presented initially. While it can enhance a strong candidate set, it cannot generate recall from a weak one.
 
 ### Tier 2 judged synthesis
 
-Tier 2 covers all $n = 146$ answers, judged by `claude-opus-4-6`.
+$n=146$, judge `claude-opus-4-6`.
 
-| Metric | Score | Scored over |
-| --- | --- | --- |
-| Faithfulness | 0.947 | 146 |
-| Answer relevance | 0.777 | 143 |
-| Context precision | 0.608 | 143 |
+| Metric            | Score | Scored over |
+| ----------------- | ----- | ----------- |
+| Faithfulness      | 0.947 | 146         |
+| Answer relevance  | 0.777 | 143         |
+| Context precision | 0.608 | 143         |
 
-Out of 146 responses, three yielded unparseable relevance judgments and three produced unparseable precision judgments across four questions. These are excluded and counted separately rather than scored as zero, resulting in averages of relevance and precision over 143 assessments, while faithfulness is averaged over all 146. The failure rate for parsing is approximately 0.7 percent of judge assessments.
+Among the 146 evaluated answers, three relevance and three precision judgments were unparseable, which was distributed across four questions. These are excluded and tallied separately rather than scored as 0.0. The average relevance and precision scores therefore cover 143 responses, while faithfulness is averaged over all 146. Parse failures account for approximately 1.4% of the judge assessments.
 
-The synthesis data reveal a consistent pattern. Faithfulness remains high and nearly unchanged whether the correct paper is retrieved, with scores of 0.948 versus 0.946. This indicates the system bases its answers on grounding or chooses to decline rather than fabricating when retrieval fails. Answer relevance is slightly higher when the correct paper is retrieved, at 0.791 compared to 0.713, showing a modest but notable effect. Context precision is at 0.608, though this figure likely understates the system's accuracy, as many passages marked irrelevant by the judge still originate from the correct paper.
+Three main findings were discovered. Faithfulness remains consistently high, with nearly identical scores of 0.948 when the correct paper is retrieved and 0.946 when it is not, indicating that the system tends to ground or decline rather than hallucinate, even in retrieval failures. Answer relevance is slightly higher at 0.791 when the correct paper is fetched, versus 0.713, a modest difference. Context precision stands at 0.608, which is conservative, since many passages the judge marked irrelevant still originate from the correct paper.
 
 ## Reproducibility
 
-Reproducibility is categorized into three tiers because the deterministic core of a RAG pipeline can be exactly reproduced, whereas a model cannot. Clarifying which tier a result belongs to is more important than asserting the highest level of reproducibility.
+Reproducibility is categorized into three clear tiers because the deterministic core of a RAG pipeline is reproducible, whereas the model itself is not. It is more important to specify which tier is being claimed than to claim the highest one.
 
-The deterministic core is bitwise reproducible, producing identical bytes from a fixed corpus and configuration across chunking, cleaning, normalization, BM25 indexing, lexical retrieval, and the judge-free Tier 1 scoring. This is confirmed by rebuilding the index and recovering the same BM25 results to the digit. The model layer is only statistically reproducible, typically falling within a small noise range, rather than producing identical outputs. This is because the API is non-deterministic even at temperature zero, and models can change or be retired. A rerun may shift model-dependent figures by $0.01$ to $0.05$, while deterministic data remains consistent. As a result, the model layer serves as provenance, with committed result files like `results.jsonl` and `summary.json` for Tier 1, along with two Tier 2 files, documenting the prompts and configurations used. These files provide the reliable standard for any process relying on the language model.
+- **Bitwise**. Identical bytes are produced at every stage. From a fixed corpus and configuration, the deterministic core is bitwise reproducible. This core covers chunking, cleaning, normalization, BM25 indexing, lexical retrieval, and the judge-free Tier 1 scoring. Rebuilding the index and obtaining the same BM25 retrieval results verifies it. The model-dependent parts, namely HyDE, reranking, synthesis, and the Tier 2 judge, are bitwise reproducible only when on-disk caches store every model response keyed by model, prompt, and inputs. The cache acts as a frozen snapshot, so reruns replay identically, and the cached outputs behave as committed inputs rather than freshly generated ones.
 
-The project therefore claims bitwise reproducibility for the deterministic core and provenance for the model layer, with the committed result files serving as the record. The one piece below that bar is corpus construction, which reads a live snapshot and live citations against a date-based cutoff. So, pinning the snapshot revision, freezing the citation enrichment, and fixing the cutoff date would achieve bitwise reproducibility.
+- **Statistical**. A rerun falls within the expected noise range. This is a weaker fallback for the model layer when caches are missing, because the API is not bitwise deterministic even at temperature 0, and models may change or be retired. Clearing the cache and rerunning shifted the model-dependent numbers by 0.01-0.05, within the stated interval, while the deterministic BM25 rows remained identical.
+
+- **Provenance**. The conditions that produced a result are recorded and verifiable, even when a deprecated model prevents recomputation. For anything that relies on language models, this is the realistic standard, and it is more honest than treating the model as deterministic.
+
+The project aims for bitwise reproducibility in the deterministic basis and employs provenance and cache-backed replay for model-dependent results. The only part that currently falls short is corpus construction, which reads from a live snapshot and citations with a date cutoff, as mentioned in the limitations below. Achieving bitwise reproducibility would involve fixing the snapshot revision, freezing citation enrichment, and setting a cutoff date.
 
 ## Limitations and future work
 
-The evaluation has certain limitations. Its questions are generated by `claude-sonnet-4-6`, the same model used for HyDE, reranking, and synthesis. Although the Tier 2 judge is different and question-to-chunk overlap is openly measured, the benchmark remains synthetic and partly authored by the system's own model family. Human-curated questions would enhance its robustness. The faithfulness score, at $0.947$, reflects the proportion of answer claims supported by retrieved passages, not their scientific accuracy. Without domain-expert review, a confidently cited but incorrect passage could still be considered faithful. Additionally, the small set of 146 questions reduces stratification, especially since only fourteen fall into the high-overlap category.
+- **Synthetic, single-model-family evaluation.** The evaluation questions are generated by `claude-sonnet-4-6`, which also performs HyDE, reranking, and synthesis. The Tier 2 judge uses a different model, `claude-opus-4-6`, and the overlap between each question and its source chunk is measured so that the keyword edge passed to BM25 is transparent rather than hidden. Because the benchmark is synthetic and partly authored by the system's own model family, it has real validity limits, and human-curated questions would strengthen it considerably.
 
-Some limits are intentionally set. The system doesn't use dense retrieval, which results in about ten points of paper recall loss initially, but decreases to around three points after reranking both pools. Therefore, implementing a dense first stage could be an extension but not necessarily better. HyDE is applied to all queries, mainly benefiting paraphrased third questions but slightly impairing high-overlap questions; routing based on estimated overlap could maintain benefits while reducing costs. Retrieval and answering are performed in one step, without breaking down multi-step questions, calling tools, or self-critique, which are potential future improvements.
+- **Faithfulness measures groundedness, not truth.** The 0.947 faithfulness score is the proportion of answer claims supported by retrieved passages, not a check of their scientific correctness. No domain expert validation was performed, so a confidently cited but incorrect passage can still score as faithful. The score reflects resistance to hallucination, not factual accuracy.
 
-Other issues are minor. The corpus is a snapshot at a specific date, so rerunnings aren't reproducible unless a versioned corpus is used. The current presentation doesn't ensure per-paper diversity, so a paper might appear multiple times until deduplication is implemented. Some residual noise remains, such as acknowledgment text under malformed sections and about one percent of chunks as short fragments; these can be eliminated with a body-level acknowledgment filter and more rigorous chunking.
+- **No dense retrieval, by design.** A strong embedder beats BM25 by about ten points in paper recall at the single retrieval stage. Once pools are reranked, this gap narrows to about three points and falls within the noise. The lexical pipeline is better at the chunk level, so adding a dense first stage before reranking would give only marginal paper-level gains and remains an optional extension.
+
+- **HyDE is a targeted lever applied unconditionally.** HyDE markedly improves reranked chunk recall on roughly one third of questions, almost doubling it, while slightly hurting high-overlap questions. Applying it conditionally on estimated query overlap would keep the benefit and cut unnecessary cost.
+
+- **Evaluation set size.** Both tiers now cover the full set of 146 questions, with confidence intervals of roughly 0.08. A larger set would improve stratification, since the high-overlap band holds only 14 questions.
+
+- **Single-shot, not agentic.** The system retrieves and answers in one pass, without decomposing multi-step questions, calling tools, or self-critique. Each of these is a possible future enhancement.
+
+- **Presentation versus measurement.** The current display does not account for per-paper diversity, so the same paper can appear several times. Simple deduplication would improve presentation without changing scoring.
+
+- **Corpus is a point-in-time snapshot.** The corpus is captured live with a date-based recency cutoff, which makes its construction non-reproducible. A versioned corpus would lock the snapshot and cutoff.
+
+- **Residual data noise.** Some acknowledgment text under malformed sections can survive cleaning, and about 1% of chunks are short fragments. A body-level acknowledgment filter and stricter chunking would address both.
 
 ## References
 
@@ -129,3 +165,4 @@ Other issues are minor. The corpus is a snapshot at a specific date, so rerunnin
 5. Sun, Weiwei, Lingyong Yan, Xinyu Ma, Shuaiqiang Wang, Pengjie Ren, Zhumin Chen, Dawei Yin, and Zhaochun Ren. 2023. "Is ChatGPT Good at Search? Investigating Large Language Models as Re Ranking Agents." In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP), 14918 to 14937. ACL Anthology.
 
 6. Zheng, Lianmin, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric P. Xing, Hao Zhang, Joseph E. Gonzalez, and Ion Stoica. 2023. "Judging LLM as a Judge with MT Bench and Chatbot Arena." In Advances in Neural Information Processing Systems 36 (NeurIPS 2023), Datasets and Benchmarks Track, 46595 to 46623.
+
