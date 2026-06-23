@@ -6,6 +6,8 @@ app_file: src/app.py
 pinned: false
 ---
 
+[![CI](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/jsf3467v/climate-science-rag/actions/workflows/ci.yml)
+
 # Climate Science arXiv RAG
 
 The system answers climate science questions using only evidence it retrieves from a corpus of approximately 3,000 arXiv papers, never from the language model's own training. Each claim in an answer comes from a specific retrieved passage and is cited to it, so a reader can trace every statement back to its source paper. When the corpus holds no passage that addresses a question, the system declines rather than fills the gap from memory. Restricting every answer to cited source evidence in this way is what grounded means here, and the retrieval and reranking stages described below exist to place the most relevant passages in front of the model before it writes.
