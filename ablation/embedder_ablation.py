@@ -1,6 +1,6 @@
 """Dense-embedder retrieval ablation for the climate-arXiv RAG project (ablation/).
 
-This measures the cost of the constraint "no pretrained models except the LLM' at the
+This measures the cost of the constraint "no pretrained models except the LLM" at the
 retrieval layer. A pretrained sentence-transformer is evaluated using the same
 question set, ground-truth source chunk, and recall and MRR metrics employed by the production
 lexical evaluation, making the BM25 and embedder rows directly comparable. The embedder exists
@@ -9,7 +9,7 @@ input and without an API; the only expense is local encoding, which is saved to 
 within a per-model subfolder. This setup allows for recovery after crashes and ensures that swapping models does not mix vectors.
 
 
-    pip install -r requirements.txt -r ablations/requirements-ablation.txt
+    pip install -r requirements.txt -r ablation/requirements-ablation.txt
     python ablation/embedder_ablation.py --device mps
     python ablation/embedder_ablation.py --device mps --model thenlper/gte-large
 """

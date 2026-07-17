@@ -1,6 +1,6 @@
 """FAISS dense index for the climate-arXiv RAG dense-retrieval comparison (ablation/).
 
-The Mirrors indexer.py on the dense side encodes the chunked corpus using a
+Mirrors indexer.py on the dense side. It encodes the chunked corpus using a
 pretrained sentence-transformer and constructs an exact inner-product FAISS index with
 normalized vectors (where inner product on normalized vectors equals cosine similarity).
 The embedder, being pretrained, resides outside src/ to keep the shipped system lexical.
@@ -9,7 +9,7 @@ crashed run to resume from the last saved block, with vectors shared across the
 single-stage ablation. The index is generated once and is skipped if it already exists.
 
 
-    pip install -r requirements.txt -r ablations/requirements-ablation.txt
+    pip install -r requirements.txt -r ablation/requirements-ablation.txt
     python ablation/dense_index.py --device mps
     python ablation/dense_index.py --device mps --model thenlper/gte-large --refresh
 """

@@ -36,10 +36,10 @@ BUNDLE = index_artifacts(RetrieveConfig())
 RCFG, HCFG, SCFG = RerankerConfig(), HydeConfig(), SynthConfig()
 
 INTRO = ("# Climate-science arXiv RAG\n"
-         "Grounded answers with citations over about 3,000 climate papers. "
-         "Retrieval is BM25 with HyDE query expansion and a Claude reranker; "
-         "answers cite only the retrieved passages and say so plainly when the "
-         "corpus does not cover the question.")
+         "Grounded and cited answers to climate-science questions, drawn from approximately "
+         "3,000 arXiv papers. The retrieval combines BM25 with HyDE query expansion "
+         "and a Claude reranker. Each answer uses only the retrieved passages, and "
+         "it responds and notifies when the corpus does not cover the question.")
 
 
 def sources(chunks: list[dict]) -> str:
