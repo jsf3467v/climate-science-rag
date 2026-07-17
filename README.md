@@ -85,6 +85,16 @@ Recall by overlap band follows for the reranked paths, given as chunk recall the
 
 On the paraphrased band, HyDE nearly doubles reranked chunk recall, from 0.185 to 0.352, and raises paper recall by thirteen points, from 0.685 to 0.815. It performs slightly worse on high-overlap questions, where the expansion only adds plausible competitors to an already well-matched query. The overall neutrality is the average of this targeted gain and the small loss. HyDE therefore proves effective in the exact failure mode it was designed for and remains valuable. Routing HyDE by estimated query overlap, so that it applies only to low-overlap queries, is a logical refinement.
 
+### Significance
+
+Every comparison above is measured on the same 146 questions, so each pair shares identical inputs. A paired bootstrap over the questions gives a confidence interval for each mean difference, and an exact McNemar test gives a $p$ value for the two binary recall metrics. Both run in `evaluation/significance.py`, which reads the per-question results and writes `significance.json`. The figure of 0.08 quoted above is the normal approximation of the confidence interval half-width for a proportion at this sample size. It serves as a conservative guide, while the paired tests give the exact 
+result for each comparison.
+
+The move from BM25 to the reranked path is unambiguous. Chunk recall rises by 0.171 and paper recall by 0.158, each at $p = 0.0001$, with both intervals well clear of zero. The overall difference between the reranked path with HyDE and the reranked path without it stays inside noise, with a chunk recall $p$ value of 0.57 and a paper recall $p$ value of 0.85, which confirms that HyDE adds nothing once the full set is pooled. The value of HyDE appears only after the set is split by overlap. On the low-overlap band the chunk recall gain of 0.167 is significant at $p = 0.0225$, while the 
+paper recall gain of 0.130 is consistent but falls just short of the same threshold at $p = 0.0654$. HyDE therefore earns its place through a real effect on the paraphrased questions it was built for, and that effect is firmest at the chunk level.
+
+The dense retrieval ablation below is reported with the same normal approximation rather than a paired test, because the stored output retains only the summarized dense scores and not the per-question values needed to reconstruct the paired comparison.
+
 ### Dense retrieval ablation, the cost of the constraint
 
 An ablation evaluates the cost of the lexical-only constraint during retrieval. A pretrained sentence transformer is indexed in FAISS and scored against BM25 with the same questions, source chunks, and recall and MRR metrics, which allows a direct comparison of rows. The embedder exists only within the ablation (`ablation/`) and is not part of the deployed system. Two models represent two honest scenarios. The first is a small, general model with a short context window, and the second is a more powerful model that processes the full chunk.
@@ -167,4 +177,3 @@ The project aims for bitwise reproducibility in the deterministic basis and empl
 5. Sun, Weiwei, Lingyong Yan, Xinyu Ma, Shuaiqiang Wang, Pengjie Ren, Zhumin Chen, Dawei Yin, and Zhaochun Ren. 2023. "Is ChatGPT Good at Search? Investigating Large Language Models as Re Ranking Agents." In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP), 14918 to 14937. ACL Anthology.
 
 6. Zheng, Lianmin, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric P. Xing, Hao Zhang, Joseph E. Gonzalez, and Ion Stoica. 2023. "Judging LLM as a Judge with MT Bench and Chatbot Arena." In Advances in Neural Information Processing Systems 36 (NeurIPS 2023), Datasets and Benchmarks Track, 46595 to 46623.
-
