@@ -4,7 +4,7 @@ Every time the pipeline requests JSON from a model (for question generation, rer
 it receives output wrapped in prose. Each parser extracts the content from the first opening
 bracket to the last closing bracket and attempts json.loads. This logic, which was previously
 duplicated four times, is now centralized in a single version. It returns None for any failure such as a missing
-bracket, malformed JSON, or incorrect root type—allowing callers to distinguish between a parse
+bracket, malformed JSON, or incorrect root type, allowing callers to distinguish between a parse
 failure and a valid result instead of silently defaulting.
 
 """

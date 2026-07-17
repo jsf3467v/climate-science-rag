@@ -1,12 +1,10 @@
 """Tier-1 retrieval evaluation for the climate-arXiv RAG project (evaluation/).
 
-Scores three configurations. BM25 only, BM25-over-HyDE, and HyDE+Claude-rerank—on the question set,
-comparing each to the ground-truth source chunk from which the question originated. Metrics include
-recall@k and MRR at both chunk and paper levels, all objective and deterministic, providing a clear
-assessment of whether HyDE and the reranker add value. The per-paper diversity cap is intentionally
-disabled here to prevent masking same-paper hits; the focus is on ranking n quality. The HyDE and the
-reranker reuse their on-disk caches, so rerunning incurs no additional cost. The setup is outside src/, so src/ is added to the path.
-
+Scores four configurations, BM25, BM25-over-HyDE, HyDE plus Claude rerank, and
+rerank without HyDE, against each question's source chunk. Reports recall and MRR
+at chunk and paper level, deterministically. The per-paper diversity cap is
+disabled here so same-paper hits are not masked. HyDE and the reranker reuse their
+on-disk caches, so a rerun adds no cost. Runs outside src/ and adds src/ to the path.
 
     export ANTHROPIC_API_KEY=...
     python evaluation.py

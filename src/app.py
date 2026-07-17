@@ -1,7 +1,7 @@
 """Gradio app for the climate-arXiv RAG system (repo root).
 
 The system serves the measured pipeline, which includes HyDE-expanded BM25, Claude rerank, and grounded
-synthesis with citations—behind a single question box. It calls
+synthesis with citations, behind a single question box. It calls
 synthesize.context() and answer(), following the exact process used during evaluation, so users see exactly
 what was measured. The index and chunks are loaded once at startup.
 The Anthropic key is retrieved from the environment (set as a Space secret, not entered in the UI).

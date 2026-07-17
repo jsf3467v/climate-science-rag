@@ -61,9 +61,9 @@ def claude_ranking(query: str, candidates: list[dict], client: Anthropic, cfg: C
 
 
 def cache_key(query: str, candidates: list[dict], cfg: Config) -> str:
-    # Temperature and max_tokens are not in this key, so clear rerank_cache.db if you change either.
+    # Temperature and max_tokens are part of the key, so changing either invalidates the cache on its own.
     ids = ",".join(c["chunk_id"] for c in candidates)
-    payload = f"{cfg.model}|{cfg.snippet_chars}|{SYSTEM}|{query}|{ids}"
+    payload = f"{cfg.model}|{cfg.temperature}|{cfg.max_tokens}|{cfg.snippet_chars}|{SYSTEM}|{query}|{ids}"
     return hashlib.sha1(payload.encode()).hexdigest()
 
 
