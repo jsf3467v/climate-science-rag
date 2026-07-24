@@ -20,7 +20,7 @@ from pathlib import Path
 import joblib
 from rank_bm25 import BM25Okapi
 
-from config import IndexerConfig as Config
+from config import IndexerConfig as Config, rooted
 from tokenizer import tokens
 
 
@@ -38,7 +38,7 @@ def manifest(texts: list[str], cfg: Config) -> dict:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "config": {"bm25_k1": cfg.bm25_k1, "bm25_b": cfg.bm25_b,
-                   "chunks_path": str(cfg.chunks_path)},
+                   "chunks_path": rooted(cfg.chunks_path)},
         "counts": {"chunks": len(texts)},
         "artifacts": ["bm25.joblib"],
     }
