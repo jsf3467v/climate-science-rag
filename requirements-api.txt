@@ -1,0 +1,5 @@
+# HTTP service dependencies. Kept apart from requirements.txt so the Gradio
+# Space build and the measured numbers stay unchanged.
+-r requirements.txt
+fastapi==0.141.1
+uvicorn[standard]==0.38.0

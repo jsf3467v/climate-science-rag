@@ -1,0 +1,13 @@
+# Large Git LFS artifacts, mounted at run time instead of baked into the image.
+index/
+data/
+
+# Not needed to serve.
+ablation/
+evaluation/
+.git/
+.github/
+__pycache__/
+*.pyc
+*_cache.db
+.DS_Store

@@ -1,0 +1,23 @@
+name: climate-science-rag
+
+# One image, two services. The host folders index/ and data/ hold the Git LFS
+# artifacts and map read-only onto the in-container paths config.py expects
+# (ROOT = /app). The API key passes through from the host environment.
+x-app: &app
+  build: .
+  image: climate-science-rag:api
+  environment:
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  volumes:
+    - ./index:/app/index:ro             # bm25.joblib and the manifest
+    - ./data:/app/data:ro               # chunks_norm.jsonl
+
+services:
+  api:                                  # serves /health, /search, /answer
+    <<: *app
+    ports:
+      - "8000:8000"
+
+  test:                                 # route contract tests, no model call
+    <<: *app
+    command: ["pytest", "-q", "tests/test_api.py"]
